@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset="utf-8" />              <!-- se usa para que la página reconozca caracteres especiales como acentos-->
+    <title>D3.js Step by Step: Step 6 - Animating Interactivity</title> <!--titulo que aparece en la pestaña del navegador-->
+    <link data-require="normalize@*" data-semver="3.0.1" rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/normalize/3.0.1/normalize.min.css" />  <!-- importa la libreria ajax a la página web-->
+    <style>                               /*inicio de las configuraciones de estilos para la página web*/
+      #chart {                            /*define los estilos para el contenido solo de la etiqueta chart*/
+        height: 360px;                    /*declara el alto de la etiqueta chart*/
+        margin: 0 auto;                   /* declara el margen de la etiqueta de para que aparezca en 0 */
+        position: relative;               /*posición que tendrá la etiqueta en el documento, es relativa, funciona a su propia posición*/
+        width: 360px;                     /*ancho que tendrá la etiqueta*/
+      }
+      .tooltip {                          /*afecta a los elementos que están relacionados al nombre de la variable tooltip*/
+        background: #eee;                 /*declara el color del fonde de la etiqueta tooltip*/
+        box-shadow: 0 0 5px #999999;      /*caracteristicas de sombras que tendrá el panel*/
+        color: #333;                      /*color de las letras*/
+        display: none;                    /*afecta a toda la ventana del navegador*/
+        font-size: 12px;                  /*establece el tamaño de fuente que se utilizará dentro de la etiqueta*/
+        left: 130px;                      /*establece la distancia que tiene con el margen izquierdo al tener posición absoluta*/
+        padding: 10px;                    /*relleno que existe en el interior desde el contenido hasta los límites de la etiqueta*/
+        position: absolute;               /*posición que tendrá la etiqueta en el documento, es relativa, funciona a su propia posición*/
+        text-align: center;               /*alineación que tedrá el texto dentro de la etiqueta*/
+        top: 95px;                        /*determina la distancia entre el borde superior del elemento y el borde superior del bloque que lo contiene*/ 
+        width: 80px;                      /*ancho que tendrá la etiqueta*/
+        z-index: 10;                      /*determina el orden que tendrá el elemento*/
+      }
+      .legend {                           /*afecta a los elementos que están relacionados al nombre de la variable legend*/
+        font-size: 12px;                  /*establece el tamaño de fuente que se utilizará dentro de la etiqueta*/
+      }
+      rect {                              /*afecta a los elementos que están relacionados a los rectangulos que se declaran para el gráfico*/
+        cursor: pointer;                  /*indica el tipo de cursor que se muestra cuando se apunta a algún elemento, al ser pointer, indica un enlace */
+        stroke-width: 2;                  /*especifica la anchura y color del trazo para los caractéres de texto y las lineas que tendrán los rectangulos del gráfico*/
+      }
+      rect.disabled {                     /* propiedades para la etiqueta rect que dibuja rectangulos */
+        fill: transparent !important;     /* se usa de relleno para elementos rectangulos del SVG */
+      }                                                               /* NEW */
+      h1 {                                /* propiedades para el titulo en H1 */
+        font-size: 14px;                  /*establece el tamaño de fuente que se utilizará para el titulo en h1*/
+        text-align: center;               /*alineación que tedrá el texto*/
+      }                                                               /* NEW */
+    </style>                              <!--fin de la declaración de los estilos-->
+  </head>                                 <!--fin del encabezado de la página-->
+
+  <body>                                  <!--inicio del cuerpo del documento-->
+    <h1>Toronto Parking Tickets by Weekday in 2012</h1>              <!--titulo que aparece dentro del cuerpo del documento-->
+    <!-- NEW -->
+    <div id="chart"></div>                <!--declaración de la etiqueta chart, el cual contendrá el gráfico-->
+    <script src="https://d3js.org/d3.v4.min.js" data-semver="4.0.0" data-require="d3@*"></script><!--script de importación de la libreria d3-->
+    <script>                              //inicio de script 
+      (function(d3) {                     //declaración e inicio de la función d3
+        'use strict';                     //declara que el método a usar será de modo estricto
+
+        var width = 360;                  //esta variable declara el ancho que tendrá el gráfico 
+        var height = 360;                 // esta variable declara el alto que tendrá el gráfico
+        var radius = Math.min(width, height) / 2;  //esta variable señala que los datos se representarán en forma circular y mostrará solo la mitad del radio
+        var donutWidth = 75;              //declara el ancho que tendrá la gráfica en forma circular
+        var legendRectSize = 18;          //declara el tamaño de las leyendas que apareceran en el gráfico que tendrán formas rectangulares, son los que aparecen en el centro del gráfico con las leyendas con los nombres de los días
+        var legendSpacing = 4;            //declara el espacio que tendrán las leyendas 
+
+        var color = d3.scaleOrdinal(d3.schemeCategory20b);  // aquí se almacenan colores que estarán contenidos en el esquema
+
+        //crear contenedor svg, todos devolverán elementos vacíos hasta que se le agreguen datos
+          var svg = d3.select('#chart')   // hace referencia al objeto D3, para que se puedan usar sus métodos y selecciona un solo elemento en el DOM, en este caso es la etiqueta chart, ahí se incluirá el gráfico que se creará, que al principio estará vacío
+          .append('svg')                  // esto agrega el gráfico svg al documento para que su uso
+          .attr('width', width)           // atributo que se va añadiendo al gráfico para mostrarse en el documento, el cual toma su valor en la variable width para manipular la anchura del gráfico dentro del documento
+          .attr('height', height)         // atributo que se va añadiendo al gráfico para mostrarse en el documento, el cual toma su valor en la variable height para manipular la altura del gráfco dentro del documento
+          .append('g')                    // este elemento se usa para agrupar formas svg que se irán generando, en este caso se incluirán cada segmento que corresponde a las gráficas generadas de acuerdo a los datos, con propiedades de alto y ancho 
+          .attr('transform', 'translate(' + (width / 2) + 
+            ',' + (height / 2) + ')');    // transformaciones que se les realizará al gráfico, este muestra la funcion traslate, el cual va asignando cada segmento svg generado y almacenado en la variable g, al lado de otro segmento, hasta completar la circunferencia, pero como están dividido entre 2 solo se mostrará la mitad de la altura y del ancho
+
+        var arc = d3.arc()                //declaración de arcos que formarán el svg y los elementos que contendrán
+          .innerRadius(radius - donutWidth) //la medida del radio del círculo se le resta el ancho que tendrá la circunferencia
+          .outerRadius(radius);           //declara las caracteristicas que tendrán cada circunferencia generada al momento de insertarse en el DOM
+
+        var pie = d3.pie()                //declara la variable pie haciedo referencia a la libreria d3
+          .value(function(d) { return d.count; }) //añade a 'd' como parámetro al contador 
+          .sort(null);                    //ciclo que se sigue para ordenar el valor para cada dato de la función
+
+        var tooltip = d3.select('#chart') //selecciona todos los elementos del div chart, referenciando a d3 para hacer uso de su libreria
+          .append('div')                  //agrega una etiqueta dentro del div chart
+          .attr('class', 'tooltip');      //agrega la clase tooltip a todos los elementos svg del div chart, estos son los que se muestran como eventos al pasar el puntero sobre las gráficas svg
+        
+        tooltip.append('div')             //agrega un div dentro de la etiqueta tooltip, se mostrará al pasar el cursor sobre la gráfica
+          .attr('class', 'label');        //agrega la clase label del archivo .csv dentro de la etiqueta tooltip
+
+        tooltip.append('div')             //agrega un div dentro de la etiqueta tooltip, se mostrará al pasar el cursor sobre la gráfica
+          .attr('class', 'count');        // agrega la clase count del archivo csv dentro de la etiqueta tooltip
+
+        tooltip.append('div')             //agrega un div dentro de la etiqueta tooltip, se mostrará al pasar el cursor sobre la gráfica
+          .attr('class', 'percent');      //agrega la clase percent dentro de la etiqueta tooltip, muestra el porcentaje que corresponde a cada elemento de la gráfica de acuerdo a su tamaño según su valor en la clase count
+
+        d3.csv('weekdays.csv', function(error, dataset) { //usando la libreria d3, se hace referncia al archivo weekdays.csv, el cual contiene los datos que se agregarán a los elementos vacíos anteriores para su gráficación 
+          dataset.forEach(function(d) {   //para cada dato se le pasará la variable 'd' como parámetro, en ella se almacenarán para graficar
+            d.count = +d.count;           //el parámetro 'd' se irá incrementando en la posición del contador, se colocará cada elemnto de 'd' uno al lado del otro hasta cerrar la circunferencia
+            d.enabled = true;             // activa todos los parámetros de 'd' 
+          });
+            
+            //crea elementos svg a partir de datos contenidos en el archivo weekdays.csv
+          var path = svg.selectAll('path')      //selecciona todos los elementos y crea la plantilla del gráfico de tipo path, el cual incluye diferentes formas como circulares, rectangulos, lineas, rellenos,
+            .data(pie(dataset))                 //esta función asocia los datos del archivo csv, cuenta, recorre todos los datos y los agrega
+            .enter()                            // este método revisa el DOM y los datos que serán registrados, si hay más datos que elementos, crea un elemnto temporal
+            .append('path')                     // asocia los gráficos con los datos del archivo csv, utiliza el elemnto generado por enter e inserta el elemento en el DOM
+            .attr('d', arc)                     // datos que son ingresados como atributos
+            .attr('fill', function(d, i) {      // colores  de relleno que se le agregarán a los elementos svg en las posiciones 'i' del parámetro 'd'
+              return color(d.data.label);       // colores que se le agregarán de acuerdo los datos en atributos label
+            })                                                        // UPDATED (removed semicolon)
+            .each(function(d) { this._current = d; });  //declara que para cada función se pasará 'd' como parámetro
+
+          path.on('mouseover', function(d) {    //incia la función mouseover, el cual se activa al pasar el cursor sobre ciertos elementos y muestra, en un bloque, parámetros almacenados en 'd'
+            var total = d3.sum(dataset.map(function(d) { //se declara la variable total, almacena la suma de los valores del dataset y de los parámetros de 'd'
+              return (d.enabled) ? d.count : 0; // retorna 'd' activado en la posición del parámetro 'd' en el count, 
+            }));
+            var percent = Math.round(1000 * d.data.count / total) / 10; //define la variable percent para el porcenteje usados en la gráfica, divide cada valor de count almacenado en el parámetro 'd' entre la variable total, multiplica cada resultado por 1000 y posteriormente lo divide entre 10, esos serán los porcentajes que corresponderán a cada elemento gráfico del svg
+            tooltip.select('.label').html(d.data.label); // selecciona el parámetro label y lo agrega al div tooltip que se mostrará en el DOM
+            tooltip.select('.count').html(d.data.count); // selecciona el parámetro count y lo agrega al div tooltip que se mostrará en el DOM
+            tooltip.select('.percent').html(percent + '%'); // selecciona el parámetro percent y lo agrega al div tooltip que se mostrará en el DOM
+            tooltip.style('display', 'block');   //cada parámetro anterior los selecciona, les coloca estilos y los muestra en un solo bloque, los agrega a la clase display
+          });
+          
+          path.on('mouseout', function() {      //inicia la función mouseout
+            tooltip.style('display', 'none');   //define la función que se realizará cuando el cursor esté fuera de los elementos del svg, esta función en el display nomostrará nada
+          });
+
+          /* OPTIONAL 
+          path.on('mousemove', function(d) {
+            tooltip.style('top', (d3.event.pageY + 10) + 'px')
+              .style('left', (d3.event.pageX + 10) + 'px');
+          });
+          */
+            
+          var legend = svg.selectAll('.legend')  //selecciona todos los elementos  de la función legend que se usarán como leyendas al pasar el cursor en cada segmento del gráfico, el cual devolverá los elementos dentro del DOM en la etiqueta chart
+            .data(color.domain())               //el dominio de los colores estará de acuerdo a los datos, de ahí se determinará cual va de colores más fuertes y cual de colores claros
+            .enter()                            //devuelve la referencia al espacio que se utiliza para el nuevo elemento
+            .append('g')                        //añade la función legend al DOM
+            .attr('class', 'legend')            //añade a la clase la funcón legend para que se muestre en la etiqueta
+            .attr('transform', function(d, i) { //se declara la fución que se utilizará ´para las caracteristicas que tendran las leyendas, en donde se declara 'i' para las operaciones y se pasa 'd´ como atributo
+              var height = legendRectSize + legendSpacing; //se multiplica el tamaño de los rectángulos por el espacio que estará disponibe
+              var offset =  height * color.domain().length / 2; //se determina el color de los rectángulos de las leyendas
+              var horz = -2 * legendRectSize;   //el tamaño de los rectangulos de las leyendas se escalan por dos 
+              var vert = i * height - offset;   //i se va incrementando para cada circulo,de manera que, en el siguiente circulo i será mayor, colocando ese circulo al lado del anterior
+              return 'translate(' + horz + ',' + vert + ')'; //regresa los valores del resultado de la operación anterior, en el cual 'i' se va incrementando para cada circulo,de manera que, en el siguiente circulo 'i' será mayor, colocando ese circulo al lado del anterior
+            });
+
+          legend.append('rect')                 //añade a la etiqueta de las leyendas los rectangulos que estarán acompañando a estos
+            .attr('width', legendRectSize)      //añade al ancho la propiedad de la variable legendRectsize, ancho para las leyendas
+            .attr('height', legendRectSize)     //cambia la propiedad de la altura por los valores de la variable legendRectSize, alto para las leyendas                      
+            .style('fill', color)               //declara los colores que serán asignados a los rectángulos que estarán al lado de las leyendas, que tendrán de estilos color de relleno
+            .style('stroke', color)             // declara el estilo para los bordes de los rectangulos 
+            .on('click', function(label) {      // inicia la función click que tendrá como parámetro la clase label, esoecificará que es lo que se realizará al hacer clic sobre los rectángulos
+              var rect = d3.select(this);       // define la variable rectángulo y lo selecciona, hace referencia al uso de la libreria d3
+              var enabled = true;               // declara la variable enabled y le asigna el valor true
+              var totalEnabled = d3.sum(dataset.map(function(d) { // define la variable total enabled y le asigna como valor la suma de los daros en dataset con los parámetros en 'd'
+                return (d.enabled) ? 1 : 0;     // retorna el parámetro 'd' con la variable enabled y con valor 1, si no es así se asigna el valor 0 
+              }));                                                    // NEW
+              
+              if (rect.attr('class') === 'disabled') { // selecciona el parámetro del rectángulo del gráfico, le asigna el atributo class y lo compara con disabled, estos se modificarán a activado o desactivado, se usará su valor para manipular los elementos del circulo correspondiente a cada atributo rect 
+                rect.attr('class', '');         // le agrega el atributo class con parámetros vacios a la variable rect, en caso de que rect sea igual a disabled (si no se encuentra selecionado), el rectangulo no tendrá relleno
+              } else {                          // En caso contrario:
+                if (totalEnabled < 2) return;   // si la variable total enabled es menor que 2 retorna lo siguiente:
+                rect.attr('class', 'disabled'); // al parámetro rect se le agrega el atributo class con parámetro disabled
+                enabled = false;                // y la variable enabled cambia su valor a falso
+              }                                                       // NEW
+
+              pie.value(function(d) {           // inicio de la función pie con valores del parámetro 'd'
+                if (d.label === label) d.enabled = enabled; // si el valor de label en el parámetro d es igual a label, el de enabled en 'd' es igual a enabled:
+                return (d.enabled) ? d.count : 0; // devuelve el valor de enbled en 'd' y count en 'd', si no devuelve 0
+              });                                                     // NEW
+
+              path = path.data(pie(dataset));   // el gráfico path será igual al gráfico con los datos en la variable pie
+
+              path.transition()                 // método transition en el gráfico path, que realiza transiciones de css en el path, modoficará los elementos circulares al estar activado o desactivado algún elemento del atributo rect, definido en la función anterior
+                .duration(750)                  // duración de la transición
+                .attrTween('d', function(d) {   // se hará uso de la animación attrTween para modificar elementos del svg en el DOM, con la función con parámetro 'd' 
+                  var interpolate = d3.interpolate(this._current, d); //interpolaciones de ángulos que ocurren en los elementos de la circunferencia, devuelve un número entre el ángulo inicial y el final, devuelve la función 'd'  
+                  this._current = interpolate(0); // declara el ángulo de interpolación es igual a 0
+                  return function(t) {            // regresa la función t cuando el ángulo es igual a 0
+                    return arc(interpolate(t));   // devuelve la función de arco en la interpolación t
+                  };                                                  // NEW
+                });                                                   // NEW
+            });                                                       // NEW
+            
+          legend.append('text')                 //agrega los textos del parámetro legend al DOM
+            .attr('x', legendRectSize + legendSpacing) // en el eje x se agregan las leyendas en la posición que se dan al sumar legendrectsize + legendSpacing
+            .attr('y', legendRectSize - legendSpacing) // en el eje y se agregan las leyendas en la posición que se dan al restar legendrectsize - legendSpacing
+            .text(function(d) { return d; });   //recibe los valores de la función y una vez cargados y asociados los elementos del DOM, este código cambia el contenido de la página y agrega las etiquetas en el div chart
+
+        });
+
+      })(window.d3);                            //agrega todos los elementos generados a la ventana y al DOM, haciendo referncia a la libreria d3
+    </script>                                   <!--fin del script en donde se realiza la generación del svg mediante D3-->
+  </body>                                       <!--fin del cuerpo de la página-->
+
+</html>                                         <!--fin del documento html-->
